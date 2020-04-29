@@ -86,14 +86,19 @@ function mouse(event)
 
 	//gay java map
 	var MAP = [];
+	var BMAP = [];
 	for (var i=0;i<mapY;i++)
 	{
 		MAP[i] = new Array(mapX);
+		BMAP[i]= new Array(mapX);
 	}
 	for(var i = 0; i < mapY; i++)
 	{
 		for(var j = 0; j < mapX; j++)
+		{
 			MAP[i][j]=-1;
+			BMAP[i][j]=0;
+		}
 	}
 	
 	//MAP[7][4]=100;
@@ -102,6 +107,7 @@ function mouse(event)
 
 	
 	var TILE_NAME = [];
+	TILE_NAME[0]="grass";
 	TILE_NAME[100]="mountain0";
 	TILE_NAME[101]="mountain1";
 	TILE_NAME[102]="mountain2";
@@ -123,17 +129,18 @@ function mouse(event)
 	var gdeX=[-1,0,1,-1,1,-1,0,1],gdeY=[-1,-1,-1,0,0,1,1,1];
 	function addMountain(it, jt, type)
 	{
-		MAP[it][jt]=100+type;
+		BMAP[it][jt]=100+type;
 		for(var j = 0; j < gdeX.length; j++)
 		{
 			if(it+gdeY[j]<0||it+gdeY[j]>=mapY||jt+gdeX[j]<0||jt+gdeX[j]>=mapX)
 				continue;
-			MAP[it+gdeY[j]][jt+gdeX[j]]=1100+j;
+			if(BMAP[it+gdeY[j]][jt+gdeX[j]]==0)
+				BMAP[it+gdeY[j]][jt+gdeX[j]]=1100+j;
 		}
 	}
 	addMountain(7,4,0);
-	
-	
+	addMountain(7,5,1);
+	addMountain(8,6,2);
 	
 	var CHECK_RULES=[];
 	var SPECIFIC_ID = [1,2]; //koji idovi imaju specificnu traznju
@@ -160,11 +167,17 @@ function mouse(event)
 					blockothers:0};
 			
 	CHECK_RULES[3]={ // allow only
-					id:[1100,1101,1102,1103,1104,1105,1106,1107],
+					id:[1100,1102,1105,1107],
+					smerX:[0],
+					smerY:[0],
+					type: -1,
+					blockothers: 0};
+	CHECK_RULES[4]={ // allow only
+					id:[1101,1103,1104,1106],
 					smerX:[0],
 					smerY:[0],
 					type: 2,
-					blockothers: 1};					
+					blockothers: 1};				
 
 								// znaci da ce da blokira sve u toj okolini, moze imati vise od 4 smera
 								// tipa -2 za smerX da blokira za 2 ulevo, oni su dinamicko alocirani
@@ -435,9 +448,7 @@ function mouse(event)
 	}
 	function isValid(iT, jT)
 	{
-		//if(MAP[iT][jT]!=-1)
-			//return false;
-		//for(var i = 0; i < CHECK_RULES.length; i++)
+
 		for(var i = CHECK_RULES.length-1; i >= 0 ; i--)
 		{
 			for(var j = 0; j < CHECK_RULES[i].id.length;j++)
@@ -448,7 +459,9 @@ function mouse(event)
 						continue;
 					if(jT+CHECK_RULES[i].smerX[k]<0||jT+CHECK_RULES[i].smerX[k]>=mapX)
 						continue;
-					if(MAP[iT+CHECK_RULES[i].smerY[k]][jT+CHECK_RULES[i].smerX[k]]==CHECK_RULES[i].id[j])
+						
+						
+					if(BMAP[iT+CHECK_RULES[i].smerY[k]][jT+CHECK_RULES[i].smerX[k]]==CHECK_RULES[i].id[j]||MAP[iT+CHECK_RULES[i].smerY[k]][jT+CHECK_RULES[i].smerX[k]]==CHECK_RULES[i].id[j])
 						if(CHECK_RULES[i].type==selected)
 							return true;
 						else if(CHECK_RULES[i].type==-1||CHECK_RULES[i].blockothers)
@@ -465,18 +478,13 @@ function mouse(event)
 	{
 		var item = document.getElementById('m'+'('+i+','+j+')');
 		
-		if(MAP[i][j]!=-1)
-		{
-		//	return;
-		}
 		if(selected!=-1)
 		{
 			if(!isValid(i,j))
-			{
-				
+			{		
 				item.style.backgroundColor='rgba(255,0,0,0.6)';
 			}
-			item.style.backgroundImage="url('Images/"+IMAGE_NAME[selected]+TECH_LEVEL[selected]+".png')"
+			item.style.backgroundImage="url('Images/"+IMAGE_NAME[selected]+TECH_LEVEL[selected]+".png'), " + "url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
 		}
 	}
 	function leaveBuilding(i, j)
@@ -491,8 +499,6 @@ function mouse(event)
 	{
 		if(selected==-1)
 			return;
-		//if(MAP[i][j]!=-1)
-		//	return;
 		if(!isValid(i,j))
 			return false;
 		if(!buy(selected))
@@ -521,7 +527,6 @@ function mouse(event)
 		/*linear-gradient( rgba(0,0,0,.5), rgba(0,0,0,.5) ),*/
 		newitem.style.display='inline-block';
 		newitem.setAttribute('id', 'm'+'('+i+','+j+')');
-		newitem.style.backgroundBlendMode='multiply';
 		//if(j==mapX-1)
 		//	newitem.setAttribute('class','newline');
 
@@ -530,14 +535,14 @@ function mouse(event)
 	function refreshTile(i, j)
 	{
 		var item =document.getElementById('m('+i+','+j+')');
-		if(MAP[i][j]==-1)
-			item.style.backgroundImage="url('Images/grass.png')";
-		else if(typeof TILE_NAME[MAP[i][j]] !== 'undefined')
+		if(typeof TILE_NAME[BMAP[i][j]] !== 'undefined')
 		{
-			item.style.backgroundImage="url('Images/"+TILE_NAME[MAP[i][j]]+".png')";
+			if(MAP[i][j]!=-1) 
+				item.style.backgroundImage="url('Images/"+IMAGE_NAME[MAP[i][j]]+TECH_LEVEL[MAP[i][j]]+".png'), " + "url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
+			else
+				item.style.backgroundImage="url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
 		}
-		else
-			item.style.backgroundImage="url('Images/"+IMAGE_NAME[MAP[i][j]]+TECH_LEVEL[MAP[i][j]]+".png')";
+
 	}
 	function refreshMap()
 	{
