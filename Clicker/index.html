@@ -53,7 +53,9 @@
 		<div id='map'></div>
 		<div id='about'><p>I love playing this.</p></div>
 	</div>
-	<div class='column side' id='content'></div>
+	<div class='column side' id='content'>
+		
+	</div>
 </div>
 <script>
 var x=0, y=0;
@@ -75,14 +77,15 @@ function mouse(event)
 </div><!-- container !-->
 <script>
 
-	var total=100000; // money
+	var total=10000; // money
 	var debug = 0;
 	var income = 0;
 	
 	
 	// map size and tile size
-	var mapX=15, mapY=14;
-	var tileX=50, tileY=50;
+	var mapX=50, mapY=50;
+	var startX=0,endX=15,startY=0,endY=14;
+	var tileX=50, tileY=50; //tile size
 
 	//gay java map
 	var MAP = [];
@@ -187,7 +190,15 @@ function mouse(event)
 					smerY:[0],
 					type: 2,
 					blockothers: 1,
-					background:1};				
+					background:1};	
+	CHECK_RULES[5]={ // block from self
+					id:[0,1,2,3],
+					smerX:[0],
+					smerY:[0],
+					type: -1,
+					blockothers:0,
+					background:0};		
+					
 
 								// znaci da ce da blokira sve u toj okolini, moze imati vise od 4 smera
 								// tipa -2 za smerX da blokira za 2 ulevo, oni su dinamicko alocirani
@@ -215,7 +226,7 @@ function mouse(event)
 				   ["Mine I", "Mine II", "Mine III", "Mine IV"],
 				   ["Satellite I", "Satellite II", "Satellite III", "Satellite IV"]];
 	
-	var NAME=["Potato Farm", "Potato Factory", "Potato Mine", "Potato Satellite"];
+	var NAME=["Potato Giant", "Potato Factory", "Potato Mine", "Potato Satellite"];
 	var IMAGE_NAME=["potato", "factory", "mine", "satellite"];
 	var BUILDINGS=[0,0,0,0];
 	var BUILDINGS_PRICE=[100,1500,2500,3500];
@@ -257,9 +268,9 @@ function mouse(event)
 		 switch(what)
 		 {
 			case 0:	content.style.display='block';buildings.style.display='block'; map.style.display='block';break;
-			case 1:  techs.style.display='block'; break;
-			case 2:break;
-			case 3:moneytab.style.display='none';about.style.display='block'; break;
+			case 1: techs.style.display='block'; break;
+			case 2: break;
+			case 3: moneytab.style.display='none';about.style.display='block'; break;
 		 }
 	}
 	
@@ -559,13 +570,52 @@ function mouse(event)
 	}
 	function refreshMap()
 	{
-		for(var i = 0; i < mapY; i++)
+		for(var i = startY; i < endY; i++)
 		{
-			for(var j = 0; j < mapX; j++)
+			for(var j = startX; j < endX; j++)
 			{
 				refreshTile(i,j);
 			}
 		}
+	}
+	function makeMap()
+	{
+		//tiles da ga smanjimo ako je prozor mali
+		if(getWidth()<800)
+		{
+			tileX/=2;
+			tileY/=2;
+		}
+		document.getElementById('map').style.width=tileX*(endX-startX);
+		document.getElementById('map').style.height=tileY*(endY-startY);
+		for(var i = startY; i < endY; i++)
+		{
+			for(var j = startX; j < endX; j++)
+			{
+				addTile(i,j);
+			}
+		}
+	}
+	function moveMap(jT, iT) // brise celu mapu
+	{
+		if(startX+jT>=0 && endX+jT<mapX)
+		{
+			startX+=jT;
+			endX+=jT;
+		}
+		if(startY+iT>=0 && startY < mapY)
+		{
+			startY+=iT;
+			endY+=iT;
+		}
+		document.getElementById('map').remove();
+		var a = document.createElement("div");            
+		a.setAttribute('id','map');
+		
+		document.getElementById("Center").appendChild(a);		
+		makeMap();
+		refreshMap();
+		//newitem.setAttribute('id', 'm'+'('+i+','+j+')');
 	}
 	function make()
 	{
@@ -582,6 +632,46 @@ function mouse(event)
 			newitem.appendChild(newitem2);
 			
 			document.getElementById("content").appendChild(newitem);		
+		}
+	//arrows	
+		{
+			var tilX=[1,-1,0,0], tilY=[0,0,1,-1];
+			
+			var tab = document.createElement("table");
+			for(var i = 0; i < 3; i++)
+			{
+				var tr = document.createElement("tr");
+				for(var j = 0; j < 3; j++)
+				{
+					var td = document.createElement("td");
+					td.setAttribute('id', ('arr'+i)+j);
+					td.setAttribute('width', tileX);
+					td.setAttribute('height', tileY);
+					tr.appendChild(td);
+					
+				}
+				tab.appendChild(tr);
+			}
+			
+			document.getElementById("content").appendChild(tab);
+			document.getElementById("arr01").setAttribute('id', 'A3');
+			document.getElementById("arr10").setAttribute('id', 'A1');
+			document.getElementById("arr12").setAttribute('id', 'A0');
+			document.getElementById("arr21").setAttribute('id', 'A2');
+			for(var i = 0; i < 4; i++)
+			{
+				var tren = document.createElement("div");
+				tren.style.width=tileX;
+				tren.style.height=tileY;
+				tren.style.backgroundSize='100% 100%';
+				tren.id='a'+i;
+				tren.setAttribute('onclick', 'moveMap('+tilX[i]+','+tilY[i]+')');
+				tren.style.backgroundImage="url('Images/a"+i+".png')";
+				document.getElementById("A"+i).appendChild(tren);	
+			}
+			
+			
+			
 		}
 		
 		//cancel build button
@@ -604,21 +694,7 @@ function mouse(event)
 		
 		
 		
-		//tiles da ga smanjimo ako je prozor mali
-		if(getWidth()<800)
-		{
-			tileX/=2;
-			tileY/=2;
-		}
-		document.getElementById('map').style.width=tileX*mapX;
-		document.getElementById('map').style.height=tileY*mapY;
-		for(var i = 0; i < mapY; i++)
-		{
-			for(var j = 0; j < mapX; j++)
-			{
-				addTile(i,j);
-			}
-		}
+		makeMap();
 		refreshMap();
 	
 		
