@@ -1,0 +1,711 @@
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="MAIN.css">
+	<link rel="stylesheet" type="text/css" href="navbar.css">
+	
+	
+	<script src="lib/crossSize.js"></script>
+
+</head>
+<body onmousemove='mouse(event)'>
+<div class='container'>
+<div class='upperPage'>
+<div id='header'><h1>Giant Potato</h1></div>
+
+
+<div class='topnav'>
+	<ul>
+		<li><a id='a0' class="active" onclick='options(0)'>MAP</a></li>
+		<li><a id='a1' onclick='options(1)'>Research center</a></li>
+		<li><a id='a2'  onclick='options(2)'>Empty</a></li>
+		<li><a id='a3'  onclick='options(3)'>About</a></li>
+	</ul>
+</div>
+
+
+<div class='row'>
+	<div class='column side'>
+	
+	<p id='moneytab'><span id='money'>0</span> +<span id='perTick'></span>/s  </p>
+
+	<div id='infoContainer' >
+		<div id='Enough' class='bord'><p>You bought it.</p></div>
+		<div id='notEnough' class='bord'><p>Not enough money.</p></div>
+		<div id='infoBox' class='bord'>
+			<p id='title'></p>
+			<p id='info'></p>
+		</div>
+	</div>
+	<p id='cord'></p>
+
+	
+	<br>
+	<br>
+	<div id ='buildings'></div>
+	<br />
+	<div id='techs'></div>
+	
+	</div>
+	
+	
+	
+	<div class='column middle' id='Center'>
+		<div id='map'></div>
+		<div id='about'><p>I love playing this.</p></div>
+	</div>
+	<div class='column side' id='content'>
+		
+	</div>
+</div>
+<script>
+var x=0, y=0;
+function mouse(event)
+{
+	x = event.clientX+document.body.scrollLeft;
+	y = event.clientY+document.body.scrollTop;
+	document.getElementById("cord").innerHTML=x+'px '+y+'px';
+	//document.getElementById("k"+1).style.left = x+"px";
+	//document.getElementById("k"+1).style.top = y+"px";
+}
+</script>
+
+
+</div><!-- upperPage !-->
+<div id='footer'>
+
+</div>
+</div><!-- container !-->
+<script>
+
+	var total=10000; // money
+	var debug = 0;
+	var income = 0;
+	
+	
+	// map size and tile size
+	var mapX=50, mapY=50;
+	var startX=0,endX=15,startY=0,endY=14;
+	var tileX=50, tileY=50; //tile size
+
+	//gay java map
+	var MAP = [];
+	var BMAP = [];
+	for (var i=0;i<mapY;i++)
+	{
+		MAP[i] = new Array(mapX);
+		BMAP[i]= new Array(mapX);
+	}
+	for(var i = 0; i < mapY; i++)
+	{
+		for(var j = 0; j < mapX; j++)
+		{
+			MAP[i][j]=-1;
+			BMAP[i][j]=0;
+		}
+	}
+	
+	//MAP[7][4]=100;
+	//MAP[7][5]=101;
+	//MAP[8][7]=102;
+
+	
+	var TILE_NAME = [];
+	TILE_NAME[0]="grass";
+	TILE_NAME[100]="mountain0";
+	TILE_NAME[101]="mountain1";
+	TILE_NAME[102]="mountain2";
+	
+	var TILE_OFFSET=["NW","N","NE","W","E","SW","S","SE"];
+	for(var i = 0; i < TILE_OFFSET.length; i++)
+	{
+		TILE_NAME[1100+i]='mountain'+TILE_OFFSET[i];
+	}
+	/*
+		NW N NE
+		W  C E
+		SW S SE
+		
+		0 1 2
+		3 C 4
+		5 6 7
+	*/
+	var gdeX=[-1,0,1,-1,1,-1,0,1],gdeY=[-1,-1,-1,0,0,1,1,1];
+	function addMountain(it, jt, type)
+	{
+		BMAP[it][jt]=100+type;
+		for(var j = 0; j < gdeX.length; j++)
+		{
+			if(it+gdeY[j]<0||it+gdeY[j]>=mapY||jt+gdeX[j]<0||jt+gdeX[j]>=mapX)
+				continue;
+			if(BMAP[it+gdeY[j]][jt+gdeX[j]]==0||
+			(BMAP[it+gdeY[j]][jt+gdeX[j]]==1100||BMAP[it+gdeY[j]][jt+gdeX[j]]==1102||
+						BMAP[it+gdeY[j]][jt+gdeX[j]]==1105||BMAP[it+gdeY[j]][jt+gdeX[j]]==1107)&&(j==1||
+																								  j==3||
+																								   j==4||
+																								    j==6))
+				BMAP[it+gdeY[j]][jt+gdeX[j]]=1100+j;
+		}
+	}
+	addMountain(4,4,0);
+	addMountain(5,4,1);
+	addMountain(9,5,2);
+	
+	var CHECK_RULES=[];
+	var SPECIFIC_ID = [1,2]; //koji idovi imaju specificnu traznju
+	
+	CHECK_RULES[0]={ // block
+					id:[100,101,102],
+					smerX:[1,-1,0,0,0],
+					smerY:[0,0,1,-1,0],
+					type: -1,
+					blockothers:0,
+					background:1}; 
+					
+					
+	CHECK_RULES[1]={ // allow only
+					id:[0],
+					smerX:[1,-1,0,0],
+					smerY:[0,0,1,-1],
+					type: 1,
+					blockothers:0,
+					background:0};						
+	CHECK_RULES[2]={ // allow only
+					id:[100,101,102],
+					smerX:[1,-1,0,0],
+					smerY:[0,0,1,-1],
+					type: 2,
+					blockothers:0,
+					background:1};
+			
+	CHECK_RULES[3]={ // allow only
+					id:[1100,1102,1105,1107],
+					smerX:[0],
+					smerY:[0],
+					type: -1,
+					blockothers: 0,
+					background:1};
+	CHECK_RULES[4]={ // allow only
+					id:[1101,1103,1104,1106],
+					smerX:[0],
+					smerY:[0],
+					type: 2,
+					blockothers: 1,
+					background:1};	
+	CHECK_RULES[5]={ // block from self
+					id:[0,1,2,3],
+					smerX:[0],
+					smerY:[0],
+					type: -1,
+					blockothers:0,
+					background:0};		
+					
+
+								// znaci da ce da blokira sve u toj okolini, moze imati vise od 4 smera
+								// tipa -2 za smerX da blokira za 2 ulevo, oni su dinamicko alocirani
+	// tile_names
+	
+	
+	
+	var BASE_INCOME=[1,5,10,150];
+	var TECH=[1, 1, 1, 1];
+	var TECH_LEVEL=[0, 0, 0, 0];
+	
+	var TECH_COEF=[[2, 3, 4, 5],
+				   [2, 4, 5, 6],
+				   [2, 6, 5, 8],
+				   [2, 4, 5, 9]];
+				   
+				   
+	var TECH_NAMES=[["Potato I", "Potato II", "Potato III", "Potato IV"],
+				   ["Factory I", "Factory II", "Factory III", "Factory IV"],
+				   ["Mine I", "Mine II", "Mine III", "Mine IV"],
+				   ["Satellite I", "Satellite II", "Satellite III", "Satellite IV"]];
+	
+	var TECH_INFOS=[["This shit gives you weed", "Potato II", "Potato III", "Potato IV"],
+				   ["Factory I", "Factory II", "Factory III", "Factory IV"],
+				   ["Mine I", "Mine II", "Mine III", "Mine IV"],
+				   ["Satellite I", "Satellite II", "Satellite III", "Satellite IV"]];
+	
+	var NAME=["Potato Giant", "Potato Factory", "Potato Mine", "Potato Satellite"];
+	var IMAGE_NAME=["potato", "factory", "mine", "satellite"];
+	var BUILDINGS=[0,0,0,0];
+	var BUILDINGS_PRICE=[100,1500,2500,3500];
+	var TECH_PRICE=[500,1500,2500,3500];
+	
+	var selected=-1;
+	
+	
+	function options(what)
+	{
+		 document.getElementById('a0').setAttribute('class', '');
+		 document.getElementById('a1').setAttribute('class', '');
+		 document.getElementById('a2').setAttribute('class', '');
+		 document.getElementById('a3').setAttribute('class', '');
+		 
+		 document.getElementById('a'+what).setAttribute('class', 'active');
+		 
+		 var map = document.getElementById('map');
+		 var techs = document.getElementById('techs');
+		 var buildings = document.getElementById('buildings');
+		 var content = document.getElementById('content');
+		 var about = document.getElementById('about');
+		 var moneytab = document.getElementById('moneytab');
+		 //debug
+		 var cord = document.getElementById('cord');
+		 if(!debug)
+			cord.style.display='none';
+		 else
+			cord.style.display='block';
+		///	
+			
+		
+		 map.style.display='none';
+		 techs.style.display='none';
+		 buildings.style.display='none';
+		 content.style.display='none';
+		 about.style.display='none';
+		 moneytab.style.display='block';
+		 switch(what)
+		 {
+			case 0:	content.style.display='block';buildings.style.display='block'; map.style.display='block';break;
+			case 1: techs.style.display='block'; break;
+			case 2: break;
+			case 3: moneytab.style.display='none';about.style.display='block'; break;
+		 }
+	}
+	
+	
+	function refresh()
+	{
+		total = total + income;
+		document.getElementById('money').innerHTML=total;
+		setTimeout(refresh,1000);
+	}
+	
+
+	function updateIncome()
+	{
+		income=0;
+		for(var i = 0; i < BASE_INCOME.length; i++)
+			income += BASE_INCOME[i]*TECH[i]*BUILDINGS[i];
+	}
+	function clearBox()
+	{
+		for(var i = 0; i < BASE_INCOME.length; i++)
+			document.getElementById('b'+i).style.border='0px';
+	}
+	function drawBox(id)
+	{
+		clearBox();
+		document.getElementById('b'+id).style.border='3px solid black';
+	}
+	function select(id)
+	{
+		if(total<BUILDINGS_PRICE[id])
+		{
+			document.getElementById("notEnough").style.display='block';
+			document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;
+			return false; // nedovoljno para
+		}
+		selected=id;
+		drawBox(id);
+	}
+	
+	
+	
+	function buy(id)
+	{
+		document.getElementById('infoContainer').style.left=x+20;
+		document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;
+		
+		
+		document.getElementById('notEnough').style.display='none';
+		document.getElementById('Enough').style.display='none';
+		if(!debug)
+			if(total<BUILDINGS_PRICE[id])
+			{
+				document.getElementById("notEnough").style.display='block';
+				document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;
+				return false; // nedovoljno para
+			}
+		document.getElementById("Enough").style.display='block';
+		document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;	
+		if(!debug)
+			total-=BUILDINGS_PRICE[id];
+		document.getElementById('money').innerHTML=total;
+		BUILDINGS[id]++;
+		document.getElementById(id).innerHTML=BUILDINGS[id];
+		updateIncome();
+		infoShow(id,"b");
+		document.getElementById("perTick").innerHTML=income;
+		return true;
+	}
+	
+	function tech(id)
+	{
+		document.getElementById('notEnough').style.display='none';
+		document.getElementById('Enough').style.display='none';
+		
+		if(!debug)
+			if(total<TECH_PRICE[id]*TECH[id])
+			{
+				document.getElementById("notEnough").style.display='block';
+				document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;
+				return; // nedovoljno para
+			}
+		// info boxes
+		document.getElementById("Enough").style.display='block';
+		document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;		
+		
+		// update money and tech level
+		total-=TECH_PRICE[id]*TECH[id];
+		document.getElementById('money').innerHTML=total;
+		document.getElementById('t'+id).remove();
+		TECH[id]=TECH[id]*TECH_COEF[id][TECH_LEVEL[id]];
+		TECH_LEVEL[id]++;
+		
+		//update buildings picture
+		document.getElementById('b'+id).src="Images/"+IMAGE_NAME[id]+TECH_LEVEL[id]+'.png';
+		refreshMap();
+		
+		//update incomes
+		updateIncome();
+		document.getElementById("perTick").innerHTML=income;
+		
+		addTechButton(id);
+	}
+	function infoShow(id, type)
+	{
+		document.getElementById('infoBox').style.display='block';
+		document.getElementById('infoContainer').style.left=x+20;
+		document.getElementById('infoContainer').style.top=y-document.getElementById('infoContainer').offsetHeight;
+		
+		
+		
+		if(type=='b')
+		{
+			document.getElementById('title').innerHTML=NAME[id];
+			document.getElementById('info').innerHTML="It gives you "+ BASE_INCOME[id]*TECH[id] + " per second. <br> <br>"
+			+ (BASE_INCOME[id]*TECH[id]*BUILDINGS[id]/income*100).toFixed(2) +"% of total income. <br>"
+			+ BASE_INCOME[id]*TECH[id]*BUILDINGS[id] + "/" + income + " total.";
+		}
+		else if(type=='t')
+		{
+			document.getElementById('title').innerHTML=TECH_NAMES[id][TECH_LEVEL[id]];
+			document.getElementById('info').innerHTML= TECH_INFOS[id][TECH_LEVEL[id]]
+			+"<br><br>It gives you "+TECH_COEF[id][TECH_LEVEL[id]]+"x more per second.";
+			//+ BASE_INCOME[id]*TECH[id]*BUILDINGS[id] + "/" + income + " total.";
+		}
+		
+	}
+	
+	function infoHide()
+	{
+		document.getElementById('infoBox').style.display='none';
+		document.getElementById('notEnough').style.display='none';
+		document.getElementById('Enough').style.display='none';
+	}
+	
+	
+
+	
+	function addBuildingButton(id)
+	{
+		
+		var newitem = document.createElement("img");
+		newitem.src="Images/"+IMAGE_NAME[id]+TECH_LEVEL[id]+'.png';
+		newitem.width=2*tileX;
+		newitem.height=2*tileY;
+		newitem.style.display='block';
+		newitem.setAttribute('onclick', 'select('+id+')');
+		newitem.setAttribute('id', 'b'+id);
+		newitem.setAttribute('onmousemove', 'infoShow('+id+', \'b\')');
+		newitem.setAttribute('onmouseleave', 'infoHide()');
+		
+		var newitem2 = document.createElement("p");
+		newitem2.style.display='block';
+		newitem2.innerHTML = 'Buy ' + NAME[id] + '( ' + BUILDINGS_PRICE[id] +' )';
+		
+		
+
+		document.getElementById("buildings").appendChild(newitem2);	
+		document.getElementById("buildings").appendChild(newitem);
+		document.getElementById("buildings").appendChild(document.createElement("br"));			
+	}
+	function addCancelButton()
+	{
+		
+		var newitem = document.createElement("img");
+		newitem.src="Images/cancel.png";
+		newitem.width=2*tileX;
+		newitem.height=2*tileY;
+		newitem.style.display='block';
+		newitem.setAttribute('onclick', 'cancelBuilding()');
+		
+		
+		var newitem2 = document.createElement("p");
+		newitem2.style.display='block';
+		newitem2.innerHTML = 'Cancel selection.';
+		
+		
+		
+		document.getElementById("buildings").appendChild(newitem2);	
+		document.getElementById("buildings").appendChild(newitem);
+		document.getElementById("buildings").appendChild(document.createElement("br"));
+
+	}
+	
+	function addTechButton(id)
+	{
+		var newitem = document.createElement("button");
+		newitem.innerHTML = 'Update tech ' + TECH_NAMES[id][TECH_LEVEL[id]] + '( ' + TECH_PRICE[id]*TECH[id] +' )';
+		newitem.setAttribute('onclick', 'tech('+id+')');
+		newitem.setAttribute('id', 't'+id);
+		newitem.setAttribute('onmousemove', 'infoShow('+id+', \'t\')');
+		newitem.setAttribute('onmouseleave', 'infoHide()');
+
+		
+		document.getElementById("techs").appendChild(newitem);		
+	}
+	function isValid(iT, jT)
+	{
+
+		for(var i = CHECK_RULES.length-1; i >= 0 ; i--)
+		{
+			for(var j = 0; j < CHECK_RULES[i].id.length;j++)
+			{
+				for(var k = 0; k < CHECK_RULES[i].smerX.length;k++)
+				{
+					if(iT+CHECK_RULES[i].smerY[k]<0||iT+CHECK_RULES[i].smerY[k]>=mapY)
+						continue;
+					if(jT+CHECK_RULES[i].smerX[k]<0||jT+CHECK_RULES[i].smerX[k]>=mapX)
+						continue;
+						
+						
+					if(BMAP[iT+CHECK_RULES[i].smerY[k]][jT+CHECK_RULES[i].smerX[k]]==CHECK_RULES[i].id[j]&&CHECK_RULES[i].background||!CHECK_RULES[i].background&&MAP[iT+CHECK_RULES[i].smerY[k]][jT+CHECK_RULES[i].smerX[k]]==CHECK_RULES[i].id[j])
+						if(CHECK_RULES[i].type==selected)
+							return true;
+						else if(CHECK_RULES[i].type==-1||CHECK_RULES[i].blockothers)
+							return false;
+				}
+			}
+		}
+		for(var i = 0; i < SPECIFIC_ID.length; i++)
+			if(selected==SPECIFIC_ID[i])
+				return false;				// ovo blokira specijalne objekte
+		return true;
+	}
+	function showBuilding(i, j)
+	{
+		var item = document.getElementById('m'+'('+i+','+j+')');
+		
+		if(selected!=-1)
+		{
+			if(!isValid(i,j))
+			{		
+				item.style.backgroundColor='rgba(255,0,0,0.6)';
+				item.style.backgroundImage="url('Images/"+IMAGE_NAME[selected]+TECH_LEVEL[selected]+".png')";
+			}
+			else
+				item.style.backgroundImage="url('Images/"+IMAGE_NAME[selected]+TECH_LEVEL[selected]+".png'), " + "url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
+		}
+	}
+	function leaveBuilding(i, j)
+	{
+		var item = document.getElementById('m'+'('+i+','+j+')');
+		refreshTile(i,j);
+		item.style.backgroundColor='initial';
+		infoHide();
+		
+	}
+	function setBuilding(i, j)
+	{
+		if(selected==-1)
+			return;
+		if(!isValid(i,j))
+			return false;
+		if(!buy(selected))
+			return;
+			
+		MAP[i][j]=selected;
+	}
+	
+	function cancelBuilding()
+	{
+		clearBox();
+		selected=-1;
+	}
+	function addTile(i, j)
+	{
+		var newitem = document.createElement("div");
+		newitem.style.width=tileX;
+		newitem.style.height=tileY;
+		newitem.setAttribute('onmouseenter', 'showBuilding('+i+','+j+')');
+		newitem.setAttribute('onmouseleave', 'leaveBuilding('+i+','+j+')');
+		newitem.setAttribute('onclick', 'setBuilding('+i+','+j+')');
+		newitem.setAttribute('oncontextmenu', 'leaveBuilding('+i+','+j+');cancelBuilding();return false;');
+		newitem.setAttribute('class', 'tile');
+		//newitem.style.backgroundColor='black';
+		newitem.style.backgroundImage="url('Images/grass.png')";
+		/*linear-gradient( rgba(0,0,0,.5), rgba(0,0,0,.5) ),*/
+		newitem.style.display='inline-block';
+
+		newitem.setAttribute('id', 'm'+'('+i+','+j+')');
+		//if(j==mapX-1)
+		//	newitem.setAttribute('class','newline');
+
+		document.getElementById('map').appendChild(newitem);
+	}
+	function refreshTile(i, j)
+	{
+		var item =document.getElementById('m('+i+','+j+')');
+		if(typeof TILE_NAME[BMAP[i][j]] !== 'undefined')
+		{
+			if(MAP[i][j]!=-1) 
+				item.style.backgroundImage="url('Images/"+IMAGE_NAME[MAP[i][j]]+TECH_LEVEL[MAP[i][j]]+".png'), " + "url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
+			else
+				item.style.backgroundImage="url('Images/"+TILE_NAME[BMAP[i][j]]+".png')";
+		}
+
+	}
+	function refreshMap()
+	{
+		for(var i = startY; i < endY; i++)
+		{
+			for(var j = startX; j < endX; j++)
+			{
+				refreshTile(i,j);
+			}
+		}
+	}
+	function makeMap()
+	{
+		
+		document.getElementById('map').style.width=tileX*(endX-startX);
+		document.getElementById('map').style.height=tileY*(endY-startY);
+		for(var i = startY; i < endY; i++)
+		{
+			for(var j = startX; j < endX; j++)
+			{
+				addTile(i,j);
+			}
+		}
+	}
+	function moveMap(jT, iT) // brise celu mapu
+	{
+		if(startX+jT>=0 && endX+jT<mapX)
+		{
+			startX+=jT;
+			endX+=jT;
+		}
+		if(startY+iT>=0 && startY < mapY)
+		{
+			startY+=iT;
+			endY+=iT;
+		}
+		document.getElementById('map').remove();
+		var a = document.createElement("div");            
+		a.setAttribute('id','map');
+		
+		document.getElementById("Center").appendChild(a);		
+		makeMap();
+		refreshMap();
+		//newitem.setAttribute('id', 'm'+'('+i+','+j+')');
+	}
+	function make()
+	{
+	//resources
+		document.getElementById("perTick").innerHTML=income;
+		for(var i = 0; i < BASE_INCOME.length; i++)
+		{
+			var newitem = document.createElement("p");
+			newitem.innerHTML = NAME[i]+':';
+			
+			var newitem2 = document.createElement("span");
+			newitem2.innerHTML = BUILDINGS[i];
+			newitem2.id=i;
+			newitem.appendChild(newitem2);
+			
+			document.getElementById("content").appendChild(newitem);		
+		}
+	//arrows	
+		{
+			var tilX=[1,-1,0,0], tilY=[0,0,1,-1];
+			
+			var tab = document.createElement("table");
+			for(var i = 0; i < 3; i++)
+			{
+				var tr = document.createElement("tr");
+				for(var j = 0; j < 3; j++)
+				{
+					var td = document.createElement("td");
+					td.setAttribute('id', ('arr'+i)+j);
+					td.setAttribute('width', tileX);
+					td.setAttribute('height', tileY);
+					tr.appendChild(td);
+					
+				}
+				tab.appendChild(tr);
+			}
+			
+			document.getElementById("content").appendChild(tab);
+			document.getElementById("arr01").setAttribute('id', 'A3');
+			document.getElementById("arr10").setAttribute('id', 'A1');
+			document.getElementById("arr12").setAttribute('id', 'A0');
+			document.getElementById("arr21").setAttribute('id', 'A2');
+			for(var i = 0; i < 4; i++)
+			{
+				var tren = document.createElement("div");
+				tren.style.width=tileX;
+				tren.style.height=tileY;
+				tren.style.backgroundSize='100% 100%';
+				tren.id='a'+i;
+				tren.setAttribute('onclick', 'moveMap('+tilX[i]+','+tilY[i]+')');
+				tren.style.backgroundImage="url('Images/a"+i+".png')";
+				document.getElementById("A"+i).appendChild(tren);	
+			}
+			
+			
+			
+		}
+		
+		//cancel build button
+		addCancelButton();
+		//update buttons	
+		for(var i = 0; i < BASE_INCOME.length; i++)
+		{
+			addBuildingButton(i);
+		}
+
+		
+		
+		//	tech updates
+		
+		for(var i = 0; i < BASE_INCOME.length; i++)
+		{
+			addTechButton(i);
+		}
+		
+		
+		//tiles da ga smanjimo ako je prozor mali
+		if(getWidth()<800)
+		{
+			tileX/=2;
+			tileY/=2;
+		}
+		
+		makeMap();
+		refreshMap();
+	
+		
+	}
+	updateIncome();
+	make();
+	refresh();
+	options(0);
+</script>
+
+
+
+</body>
+</html>
